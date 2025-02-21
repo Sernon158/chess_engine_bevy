@@ -1,0 +1,1 @@
+pub const STANDARD_GAME_MINUTES: u16 = 5;

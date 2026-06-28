@@ -26,6 +26,13 @@ impl Color {
             Color::Empty => Color::Empty
         }
     }
+
+    #[inline(always)]
+    pub fn is_white(&self) -> bool { matches!(self, Color::White) }
+    #[inline(always)]
+    pub fn is_black(&self) -> bool { matches!(self, Color::Black) }
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool { matches!(self, Color::Empty) }
 }
 
 impl Piece {
@@ -35,97 +42,70 @@ impl Piece {
         &self,
         target_pos: (usize, usize),
         current_pos: (usize, usize),
-        game: &StandardGame
+        game: &StandardGame,
+        look_for_checks: bool
     ) -> bool {
         let (x, y) = target_pos;
         let (curr_x, curr_y) = current_pos;
 
         if x > 7 || y > 7 { return false };
         if target_pos == current_pos { return false };
+
+        let (&color, _) = self.get_data();
+
+        // Closure to sum `plus` to `slot`. If it's a black piece,
+        // substract the value from it instead to invert it.
+        let slotsum = |slot: usize, plus: i8| match color {
+            Color::White => (slot as i8 + plus) as usize,
+            Color::Black => (slot as i8 - plus) as usize,
+            _ => 0
+        };
         
-        match self {
-            Piece::Pawn(color, _) => {
-                if let Color::White = color {
-                    //// En passant
-                    //if let Some((x, y)) = game.en_passant {
-                    //    return (x == curr_x - 1 || x == curr_x - 1) && (y == curr_y + 1 || y == curr_y - 1)
-                    //}
+        let piece_can_move = || match self {
+            Piece::Pawn(..) => {
+                let if_color = |white: usize, black: usize| match color {
+                    Color::White => white,
+                    Color::Black => black,
+                    _ => 0
+                };
 
-                    // Capture
-                    if (curr_x > 1 && x == curr_x - 1 || curr_x < 7 && x == curr_x + 1)
-                       && y == curr_y + 1
-                    {
-                        let target = game.board.get(x, y);
-                        if target.is_none() { return false };
+                //// En passant
+                //if let Some((x, y)) = game.en_passant {
+                //    return (x == curr_x - 1 || x == curr_x - 1) && (y == curr_y + 1 || y == curr_y - 1)
+                //}
 
-                        let (target_color, _) = target.get_data();
+                // Capture
+                if (x == curr_x.wrapping_sub(1) || x == curr_x + 1)
+                && y == slotsum(curr_y, 1)
+                {
+                    let target = game.board.get(x, y);
+                    if target.is_none() { return false };
 
-                        return target_color != color
-                    }
+                    let (&target_color, _) = target.get_data();
 
-                    // Normal Pawn Movement
-                    if curr_y == 1 {
-                        let target = self.is_passable(&game.board, target_pos);
-
-                        if y == 2 { return x == curr_x && target.passable() }
-                        else if y == 3 {
-                            let prev_target = self.is_passable(&game.board, (x, y - 1));
-                        
-                            return x == curr_x && target.to_bool() && prev_target.to_bool()
-                        }
-
-                        return false
-                    } else {
-                        let one_step = self.is_passable(&game.board, target_pos);
-
-                        return x == curr_x && y == curr_y + 1 && one_step.to_bool()
-                    }
+                    return target_color != color
                 }
+
+                // Normal Pawn Movement
+                if curr_y == if_color(1, 6) && y == if_color(3, 4) {
+                    let prev_target = self
+                        .is_passable(&game.board, (x, slotsum(y, -1)));
+
+                    let target = self.is_passable(&game.board, (x, y));
                 
-                else {
-                    //// En passant
-                    //if let Some((x, y)) = game.en_passant {
-                    //    return (x == curr_x - 1 || x == curr_x - 1) && (y == curr_y + 1 || y == curr_y - 1)
-                    //}
+                    return x == curr_x
+                        && prev_target.passable()
+                        && target.passable()
+                } else {
+                    let one_step = self.is_passable(&game.board, target_pos);
 
-                    // Capture
-                    if (curr_x > 1 && x == curr_x - 1 || curr_x < 7 && x == curr_x + 1)
-                       && y == curr_y - 1
-                    {
-                        let target = game.board.get(x, y);
-                        if target.is_none() { return false };
-
-                        let (target_color, _) = target.get_data();
-
-                        return target_color != color
-                    }
-
-                    // Normal Pawn Movement
-                    if curr_y == 7 {
-                        let target = self.is_passable(&game.board, target_pos);
-
-                        if y == 2 { return x == curr_x && target.to_bool() }
-                        else if y == 3 {
-                            let prev_target = self.is_passable(&game.board, (x, y + 1));
-                        
-                            return x == curr_x && target.to_bool() && prev_target.to_bool()
-                        }
-
-                        return false
-                    } else {
-                        let one_step = self.is_passable(&game.board, target_pos);
-
-                        return x == curr_x && y == curr_y - 1 && one_step.to_bool()
-                    }
+                    return x == curr_x
+                        && y == slotsum(curr_y, 1)
+                        && one_step.passable()
                 }
             },
 
-            //
-            // TODO: Add self.is_passable conditions to ALL pieces except
-            // pawn and knight, which already have it.
-            //
-
-            Piece::Rook(_, _) => {
+            Piece::Rook(..) => {
                 let x_diff = x as i8 - curr_x as i8;
                 let y_diff = y as i8 - curr_y as i8;
 
@@ -133,41 +113,46 @@ impl Piece {
                     let range = 1..x_diff.abs();
 
                     for coord in range {
-                        let new_x = if x_diff >= 0 { curr_x + coord as usize } else { curr_x - coord as usize };
+                        let new_x = match x_diff >= 0 {
+                            true => curr_x + coord as usize,
+                            false => curr_x - coord as usize
+                        };
 
                         let target = self.is_passable(&game.board, (new_x, y));
                         if !target.passable() { return false };
                     }
-                }
-
-                else if x == curr_x && y != curr_y {
+                } else if x == curr_x && y != curr_y {
                     let range = 1..y_diff.abs();
 
                     for coord in range {
-                        let new_y = if y_diff >= 0 { curr_y + coord as usize } else { curr_y - coord as usize };
+                        let new_y = match y_diff >= 0 {
+                            true => curr_y + coord as usize,
+                            false => curr_y - coord as usize
+                        };
 
                         let target = self.is_passable(&game.board, (x, new_y));
                         if !target.passable() { return false };
                     }
-                }
-
-                else { return false };
+                } else {
+                    return false
+                };
 
                 let target = self.is_passable(&game.board, (x, y));
-                if !target.passable() && !target.capturable() { return false };
+                if !target.to_bool() { return false };
                 
-                true
+                return true
             },
 
-            Piece::Knight(_, _) => {
+            Piece::Knight(..) => {
                 let target = self.is_passable(&game.board, target_pos);
                 let x_diff = (x as i8 - curr_x as i8).abs();
                 let y_diff = (y as i8 - curr_y as i8).abs();
 
-                target.to_bool() && ((x_diff == 2 && y_diff == 1) || (x_diff == 1 && y_diff == 2))
+                return target.to_bool()
+                    && ((x_diff == 2 && y_diff == 1) || (x_diff == 1 && y_diff == 2))
             },
 
-            Piece::Bishop(_, _) => {
+            Piece::Bishop(..) => {
                 let x_diff = (x as i8 - curr_x as i8).abs();
                 let y_diff = (y as i8 - curr_y as i8).abs();
 
@@ -185,27 +170,46 @@ impl Piece {
                 }
 
                 let dest = self.is_passable(&game.board, (x, y));
-                if !dest.passable() && !dest.capturable() { return false };
+                if !dest.to_bool() { return false };
             
-                true
+                return true
             },
 
-            Piece::Queen(_, _) => {
+            Piece::Queen(..) => {
                 let x_diff = (x as i8 - curr_x as i8).abs();
                 let y_diff = (y as i8 - curr_y as i8).abs();
 
-                (x == curr_x && y != curr_y) || (y == curr_y && x != curr_x) || x_diff == y_diff
+                // Horizontal / Vertical
+                if (x == curr_x && y != curr_y) || (x != curr_x && y == curr_y) {
+                    // Delegate the check to the Rook piece
+                    return Piece::Rook(color, 255)
+                        .can_move(target_pos, current_pos, game, false)
+                }
+                // Diagonal
+                else if x_diff == y_diff {
+                    // Delegate the check to the Bishop piece
+                    return Piece::Bishop(color, 255)
+                        .can_move(target_pos, current_pos, game, false)
+                }
+
+                return false
             },
 
-            Piece::King(_color, _) => {
+            Piece::King(..) => {
                 let x_diff = (x as i8 - curr_x as i8).abs();
                 let y_diff = (y as i8 - curr_y as i8).abs();
+                let dest = self.is_passable(&game.board, (x, y));
 
-                x_diff <= 1 && y_diff <= 1
+                return x_diff <= 1 && y_diff <= 1 && dest.to_bool()
             },
 
-            Piece::None(_) => false
-        }
+            Piece::None(_) => return false
+        };
+
+        piece_can_move() && (
+               !look_for_checks
+            || (look_for_checks && !game.is_king_checked_after_move(color, (curr_x, curr_y), (x, y)))
+        )
 
         // TODO: Add a check for the king checked. If the king (of same
         // color) is still checked after this `match`, it returns false.
@@ -273,6 +277,7 @@ impl Piece {
         }
     }
 
+    /// Check if the board slot `(x, y)` is passable by this piece.
     pub fn is_passable(&self, board: &Board, (x, y): (usize, usize)) -> BoardSlotType {
         let board_piece = board.get(x, y);
         if board_piece.is_none() { return BoardSlotType::Passable };
@@ -305,6 +310,8 @@ pub enum BoardSlotType {
 
 impl BoardSlotType {
 
+    /// Return `true` if this will capture a piece
+    /// upon moving to that slot.
     pub fn capturable(&self) -> bool {
         match *self {
             Self::Capturable => true,
@@ -312,6 +319,7 @@ impl BoardSlotType {
         }
     }
 
+    /// Return `true` if this will move to an empty slot.
     pub fn passable(&self) -> bool {
         match *self {
             Self::Passable => true,
@@ -319,6 +327,8 @@ impl BoardSlotType {
         }
     }
 
+    /// Return `true` if this contains a piece of
+    /// its same color, so it cannot be passed through.
     pub fn unpassable(&self) -> bool {
         match *self {
             Self::Unpassable => true,
@@ -326,6 +336,7 @@ impl BoardSlotType {
         }
     }
 
+    /// Return `true` if this is [`Self::Capturable`] or [`Self::Passable`].
     pub fn to_bool(&self) -> bool {
         match *self {
             Self::Capturable => true,

@@ -97,7 +97,8 @@ pub fn __on_click(
                 game.board.get_piece_position(
                     &game.board.get_piece_by_id(*id).unwrap()
                 ),
-                &game
+                &game,
+                true
             );
         
             if !can_move { continue };

@@ -68,10 +68,10 @@ pub fn __on_click(
     let Ok((piece, mut animator)) = query.get_mut(input.entity())
         else { return };
     
-    let (color, id) = piece.0.get_data();
+    let Piece { id, color, .. } = piece.0;
 
     if game.animation_playing { return };
-    if game.current_turn != *color { return };
+    if game.current_turn != color { return };
 
     let mut second_click = false;
 
@@ -95,7 +95,7 @@ pub fn __on_click(
             let can_move = piece.0.can_move(
                 target_pos,
                 game.board.get_piece_position(
-                    &game.board.get_piece_by_id(*id).unwrap()
+                    &game.board.get_piece_by_id(id).unwrap()
                 ),
                 &game,
                 true
@@ -238,18 +238,17 @@ fn __on_move_animation_ended(
         let (curr_x, curr_y) = game.board.get_piece_position(&piece_component.0);
         let (target_x, target_y) = BoardComponent::get_coords_index(transform.translation);
 
-        let (curr_color, curr_id) = piece_component.0.get_data();
+        let curr_piece = piece_component.0;
+        let target_id = game.board.get(target_x, target_y).id;
 
-        let (_, target_id) = game.board.get(target_x, target_y).get_data();
-
-        (curr_x, curr_y, target_x, target_y, *curr_color, *curr_id, *target_id)
+        (curr_x, curr_y, target_x, target_y, curr_piece.color, curr_piece.id, target_id)
     };
 
     let mut moved_piece = piece_component.0;
     moved_piece.set_id(curr_id);
 
     game.board.set(target_x, target_y, moved_piece);
-    game.board.set(curr_x, curr_y, Piece::None(target_id));
+    game.board.set(curr_x, curr_y, Piece::none(target_id));
 
     game.logger.add(LogItem {
         capture: false,

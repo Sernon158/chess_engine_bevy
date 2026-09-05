@@ -1,14 +1,62 @@
 use crate::{board::Board, game::StandardGame};
 
 #[derive(PartialEq, Copy, Clone, Debug)]
-pub enum Piece {
-    Pawn(Color, u8),
-    Rook(Color, u8),
-    Knight(Color, u8),
-    Bishop(Color, u8),
-    Queen(Color, u8),
-    King(Color, u8),
-    None(u8)
+pub struct Piece {
+    pub id: u8,
+    pub kind: PieceKind,
+    pub color: Color
+}
+
+impl Piece {
+    pub fn pawn(id: u8, color: Color) -> Self {
+        Self::new(id, PieceKind::Pawn, color)
+    }
+    pub fn rook(id: u8, color: Color) -> Self {
+        Self::new(id, PieceKind::Rook, color)
+    }
+    pub fn knight(id: u8, color: Color) -> Self {
+        Self::new(id, PieceKind::Knight, color)
+    }
+    pub fn bishop(id: u8, color: Color) -> Self {
+        Self::new(id, PieceKind::Bishop, color)
+    }
+    pub fn queen(id: u8, color: Color) -> Self {
+        Self::new(id, PieceKind::Queen, color)
+    }
+    pub fn king(id: u8, color: Color) -> Self {
+        Self::new(id, PieceKind::King, color)
+    }
+    pub fn none(id: u8) -> Self {
+        Self::new(id, PieceKind::None, Color::Empty)
+    }
+
+    pub fn new(id: u8, kind: PieceKind, color: Color) -> Self {
+        Self { id, kind, color }
+    }
+
+    /// Could this piece, if it was (hypothetically) placed
+    /// in `current_pos`, move to `target_pos`?
+    pub fn could_move_to(
+        kind: PieceKind,
+        color: Color,
+        target_pos: (usize, usize),
+        current_pos: (usize, usize),
+        game: &StandardGame
+    ) -> bool {
+        Piece::new(u8::MAX, kind, color)
+            .can_move(target_pos, current_pos, game, false)
+    }
+}
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub enum PieceKind {
+    Pawn,
+    Rook,
+    Knight,
+    Bishop,
+    Queen,
+    King,
+    None
 }
 
 #[derive(PartialEq, Copy, Clone, Debug)]
@@ -51,7 +99,7 @@ impl Piece {
         if x > 7 || y > 7 { return false };
         if target_pos == current_pos { return false };
 
-        let (&color, _) = self.get_data();
+        let color = self.color;
 
         // Closure to sum `plus` to `slot`. If it's a black piece,
         // substract the value from it instead to invert it.
@@ -61,8 +109,8 @@ impl Piece {
             _ => 0
         };
         
-        let piece_can_move = || match self {
-            Piece::Pawn(..) => {
+        let piece_can_move = || match self.kind {
+            PieceKind::Pawn => {
                 let if_color = |white: usize, black: usize| match color {
                     Color::White => white,
                     Color::Black => black,
@@ -81,9 +129,7 @@ impl Piece {
                     let target = game.board.get(x, y);
                     if target.is_none() { return false };
 
-                    let (&target_color, _) = target.get_data();
-
-                    return target_color != color
+                    return target.color != color
                 }
 
                 // Normal Pawn Movement
@@ -105,7 +151,7 @@ impl Piece {
                 }
             },
 
-            Piece::Rook(..) => {
+            PieceKind::Rook => {
                 let x_diff = x as i8 - curr_x as i8;
                 let y_diff = y as i8 - curr_y as i8;
 
@@ -143,7 +189,7 @@ impl Piece {
                 return true
             },
 
-            Piece::Knight(..) => {
+            PieceKind::Knight => {
                 let target = self.is_passable(&game.board, target_pos);
                 let x_diff = (x as i8 - curr_x as i8).abs();
                 let y_diff = (y as i8 - curr_y as i8).abs();
@@ -152,7 +198,7 @@ impl Piece {
                     && ((x_diff == 2 && y_diff == 1) || (x_diff == 1 && y_diff == 2))
             },
 
-            Piece::Bishop(..) => {
+            PieceKind::Bishop => {
                 let x_diff = (x as i8 - curr_x as i8).abs();
                 let y_diff = (y as i8 - curr_y as i8).abs();
 
@@ -175,27 +221,29 @@ impl Piece {
                 return true
             },
 
-            Piece::Queen(..) => {
+            PieceKind::Queen => {
                 let x_diff = (x as i8 - curr_x as i8).abs();
                 let y_diff = (y as i8 - curr_y as i8).abs();
 
                 // Horizontal / Vertical
                 if (x == curr_x && y != curr_y) || (x != curr_x && y == curr_y) {
                     // Delegate the check to the Rook piece
-                    return Piece::Rook(color, 255)
-                        .can_move(target_pos, current_pos, game, false)
+                    return Piece::could_move_to(
+                        PieceKind::Rook, color, target_pos, current_pos, game
+                    )
                 }
                 // Diagonal
                 else if x_diff == y_diff {
                     // Delegate the check to the Bishop piece
-                    return Piece::Bishop(color, 255)
-                        .can_move(target_pos, current_pos, game, false)
+                    return Piece::could_move_to(
+                        PieceKind::Bishop, color, target_pos, current_pos, game
+                    )
                 }
 
                 return false
             },
 
-            Piece::King(..) => {
+            PieceKind::King => {
                 let x_diff = (x as i8 - curr_x as i8).abs();
                 let y_diff = (y as i8 - curr_y as i8).abs();
                 let dest = self.is_passable(&game.board, (x, y));
@@ -203,7 +251,7 @@ impl Piece {
                 return x_diff <= 1 && y_diff <= 1 && dest.to_bool()
             },
 
-            Piece::None(_) => return false
+            PieceKind::None => return false
         };
 
         piece_can_move() && (
@@ -216,65 +264,27 @@ impl Piece {
     }
 
 
-    pub fn get_display(&self) -> Option<&str> {
-        match self {
-            Piece::Pawn(color, _) => {
-                if let Color::White = color { Some("pawn") }
-                else { Some("pawn_black") }
-            },
+    pub fn get_display(&self) -> Option<String> {
+        let color = match self.color {
+            Color::Black => "_black",
+            _ => ""
+        };
 
-            Piece::Rook(color, _) => {
-                if let Color::White = color { Some("rook") }
-                else { Some("rook_black") }
-            },
+        let piece = match self.kind {
+            PieceKind::Pawn => "pawn",
+            PieceKind::Rook => "rook",
+            PieceKind::Knight => "knight",
+            PieceKind::Bishop => "bishop",
+            PieceKind::Queen => "queen",
+            PieceKind::King => "king",
+            PieceKind::None => return None
+        };
 
-            Piece::Knight(color, _) => {
-                if let Color::White = color { Some("knight") }
-                else { Some("knight_black") }
-            },
-
-            Piece::Bishop(color, _) => {
-                if let Color::White = color { Some("bishop") }
-                else { Some("bishop_black") }
-            },
-
-            Piece::Queen(color, _) => {
-                if let Color::White = color { Some("queen") }
-                else { Some("queen_black") }
-            },
-
-            Piece::King(color, _) => {
-                if let Color::White = color { Some("king") }
-                else { Some("king_black") }
-            },
-
-            Piece::None(_) => None
-        }
-    }
-
-
-    pub fn get_data(&self) -> (&Color, &u8) {
-        match self {
-            Piece::Pawn(color, id) => (color, id),
-            Piece::Rook(color, id) => (color, id),
-            Piece::Knight(color, id) => (color, id),
-            Piece::Bishop(color, id) => (color, id),
-            Piece::Queen(color, id) => (color, id),
-            Piece::King(color, id) => (color, id),
-            Piece::None(id) => (&Color::Empty, id)
-        }
+        Some(format!("{piece}{color}"))
     }
 
     pub fn set_id(&mut self, new_id: u8) {
-        match self {
-            Piece::Pawn(_, ref mut id) => *id = new_id,
-            Piece::Rook(_, ref mut id) => *id = new_id,
-            Piece::Knight(_, ref mut id) => *id = new_id,
-            Piece::Bishop(_, ref mut id) => *id = new_id,
-            Piece::Queen(_, ref mut id) => *id = new_id,
-            Piece::King(_, ref mut id) => *id = new_id,
-            Piece::None(ref mut id) => *id = new_id,
-        }
+        self.id = new_id;
     }
 
     /// Check if the board slot `(x, y)` is passable by this piece.
@@ -282,21 +292,14 @@ impl Piece {
         let board_piece = board.get(x, y);
         if board_piece.is_none() { return BoardSlotType::Passable };
 
-        let (self_color, _) = self.get_data();
-        let (piece_color, _) = board_piece.get_data();
-
-        if self_color != piece_color {
-            return BoardSlotType::Capturable
+        match self.color == board_piece.color {
+            true => BoardSlotType::Unpassable,
+            false => BoardSlotType::Capturable
         }
-
-        BoardSlotType::Unpassable
     }
 
     pub fn is_none(&self) -> bool {
-        match *self {
-            Piece::None(_) => true,
-            _ => false
-        }
+        matches!(self.kind, PieceKind::None)
     }
 
 

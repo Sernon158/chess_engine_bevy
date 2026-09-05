@@ -1,4 +1,4 @@
-use crate::pieces::Piece;
+use crate::pieces::{Piece, PieceKind};
 
 #[derive(Clone)]
 pub struct Logger {
@@ -35,8 +35,9 @@ pub struct LogItem {
 
 impl LogItem {
     pub fn is_castle(&self) -> bool {
-        let Piece::King(_, _) = self.piece
-            else { return false };
+        if self.piece.kind != PieceKind::King {
+            return false
+        }
 
         let (prev_x, prev_y) = self.start;
         let (target_x, target_y) = self.target;

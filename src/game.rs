@@ -2,7 +2,7 @@ use bevy::ecs::system::Resource;
 
 use crate::board::Board;
 use crate::logger::Logger;
-use crate::pieces::{ Color, Piece };
+use crate::pieces::{ Color, Piece, PieceKind };
 use crate::player::Player;
 
 #[derive(Clone, Resource)]
@@ -53,38 +53,37 @@ impl StandardGame {
         let mut cloned_game = self.clone();
         let piece_to_move = *cloned_game.board.get(curr_x, curr_y);
 
-        cloned_game.board.set(curr_x, curr_y, Piece::None(255));
+        cloned_game.board.set(curr_x, curr_y, Piece::none(u8::MAX));
         cloned_game.board.set(x, y, piece_to_move);
 
         // Go through all pieces in the board and find the king
         // of the color specified.
-        cloned_game.board.0.iter().flatten().any(|piece| match piece {
-            Piece::King(color, _) => {
-                if king_color != *color { return false };
+        cloned_game.board.0.iter().flatten().any(|piece| {
+            if piece.kind != PieceKind::King
+            || king_color != piece.color
+            { return false };
 
-                let king_pos = cloned_game.board.get_piece_position(piece);
+            let king_pos = cloned_game.board.get_piece_position(piece);
 
-                // Once we find the king, go through the board again and check every piece
-                // to see if it can go to the slot the king is in. If any
-                // (that isn't of the same color as the king) can, return false.
-                cloned_game.board.0.iter().flatten().any(|p| {
-                    if p.get_data().0 == &king_color { return false };
-                    
-                    p.can_move(
-                        king_pos,
-                        cloned_game.board.get_piece_position(p),
-                        &cloned_game,
-                        false
-                    )
-                })
-            },
-            _ => false
+            // Once we find the king, go through the board again and check every piece
+            // to see if it can go to the slot the king is in. If any
+            // (that isn't of the same color as the king) can, return false.
+            cloned_game.board.0.iter().flatten().any(|p| {
+                if p.color == king_color { return false };
+                
+                p.can_move(
+                    king_pos,
+                    cloned_game.board.get_piece_position(p),
+                    &cloned_game,
+                    false
+                )
+            })
         })
     }
 
     pub fn is_king_checked_at(&self, color: Color, king_pos: (usize, usize)) -> bool {
         self.board.0.iter().flatten().any(|p| {
-            if p.get_data().0 == &color { return false };
+            if p.color == color { return false };
             
             p.can_move(
                 king_pos,

@@ -1,8 +1,6 @@
 use bevy::prelude::*;
+use bevy::window::WindowResolution;
 use bevy_tweening::TweeningPlugin;
-
-use chess_engine::bevy::components::{IdleAnimator, PieceMoveAnimator};
-use chess_engine::bevy::events::AnimationCompleted;
 use chess_engine::constants::STANDARD_GAME_MINUTES;
 use chess_engine::game::StandardGame;
 use chess_engine::pieces::Color;
@@ -16,41 +14,40 @@ use chess_engine::bevy::{
 fn main() {
     let game = create_game();
 
-    let mut app = App::new();
-
-    app.add_systems(
-        Startup, 
-        (set_window_icon, spawn_camera, spawn_board, spawn_pieces)
-    );
-
-    app.add_systems(
-        Update, 
-        (idle_animator, piece_move_animator)
-    );
-
-    app.add_plugins((
-        DefaultPlugins
-            .set(WindowPlugin {
-                primary_window: Some(Window {
-                    resolution: (WINDOW_SIZE.0, WINDOW_SIZE.1).into(),
-                    title: WINDOW_TITLE.to_string(),
-                    resizable: false,
-                    // TODO: Add window icon
+    App::new()
+        .add_systems(
+            Startup, 
+            (set_window_icon, spawn_camera, spawn_board, spawn_pieces)
+        )
+        .add_systems(
+            Update, 
+            (idle_animator, piece_move_animator)
+        )
+        .add_plugins((
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        resolution: WindowResolution::new(
+                            WINDOW_SIZE.0,
+                            WINDOW_SIZE.1
+                        ),
+                        title: WINDOW_TITLE.to_string(),
+                        resizable: false,
+                        // TODO: Add window icon
+                        ..default()
+                    }),
                     ..default()
-                }),
-                ..default()
-            })
-            .set(ImagePlugin::default_nearest()),
+                })
+                .set(ImagePlugin::default_nearest()),
 
-        TweeningPlugin
-    ));
-
-    app.add_event::<AnimationCompleted<IdleAnimator>>();
-    app.add_event::<AnimationCompleted<PieceMoveAnimator>>();
-
-    app.insert_resource(game);
-
-    app.run();
+            TweeningPlugin
+        ))
+        .insert_resource(SpritePickingSettings {
+            require_markers: false,
+            picking_mode: SpritePickingMode::BoundingBox
+        })
+        .insert_resource(game)
+        .run();
 }
 
 fn create_game() -> StandardGame {

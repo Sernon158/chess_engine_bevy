@@ -1,6 +1,5 @@
 use bevy::prelude::*;
-
-use bevy_tweening::Animator;
+use bevy_tweening::TweenAnim;
 
 #[derive(Component)]
-pub struct PieceClickAnimator(pub Animator<Transform>);
+pub struct PieceClickAnimator(pub TweenAnim);

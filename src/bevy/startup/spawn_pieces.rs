@@ -1,12 +1,11 @@
+use std::time::Duration;
 use bevy::prelude::*;
 use bevy_tweening::lens::TransformScaleLens;
-use bevy_tweening::Animator;
-use bevy_tweening::EaseMethod;
-
+use bevy_tweening::{EaseMethod, EntityCommandsTweeningExtensions, TweenAnim};
 use crate::bevy::components::PieceMoveAnimator;
 use crate::bevy::components::{ BoardComponent, IdleAnimator, PieceComponent, TargetComponent };
 use crate::bevy::events::AnimationCompleted;
-use crate::bevy::methods::new_animator;
+use crate::bevy::methods::new_tween;
 use crate::bevy::structs::AnimationLoop;
 use crate::board::Board;
 use crate::game::StandardGame;
@@ -22,12 +21,10 @@ pub fn spawn_pieces(mut commands: Commands, asset_server: Res<AssetServer>) {
         let Some(image) = piece.get_display()
             else { continue };
 
-        let mut element = commands.spawn((
+        commands.spawn((
 
             Sprite {
-                image: asset_server.load(
-                    format!("textures/pieces/{}.png", image).as_str()
-                ),
+                image: asset_server.load(format!("textures/pieces/{}.png", image)),
                 custom_size: Some(Vec2::new(75., 75.)),
                 ..default()
             },
@@ -36,7 +33,7 @@ pub fn spawn_pieces(mut commands: Commands, asset_server: Res<AssetServer>) {
 
             IdleAnimator::new(),
 
-            new_animator(
+            new_tween(
                 TransformScaleLens {
                     start: Vec3::splat(1.0),
                     end: Vec3::splat(1.25)
@@ -47,25 +44,26 @@ pub fn spawn_pieces(mut commands: Commands, asset_server: Res<AssetServer>) {
                 AnimationLoop::one_run()
             ),
 
+            Pickable::default(),
+
             PieceComponent(piece.clone())
 
-        ));
-
-        element.observe(__on_click);
-        element.observe(__on_move_animation_ended);
+        ))
+        .observe(__on_click)
+        .observe(__on_move_animation_ended);
 
     }
 }
 
 pub fn __on_click(
-    input: Trigger<Pointer<Click>>,
-    mut query: Query<(&PieceComponent, &mut Animator<Transform>)>,
+    input: On<Pointer<Click>>,
+    mut query: Query<(Entity, &PieceComponent)>,
     mut game: ResMut<StandardGame>,
     targets: Query<Entity, With<TargetComponent>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>
 ) {
-    let Ok((piece, mut animator)) = query.get_mut(input.entity())
+    let Ok((_, piece)) = query.get_mut(input.entity)
         else { return };
     
     let Piece { id, color, .. } = piece.0;
@@ -121,34 +119,37 @@ pub fn __on_click(
 
                 Transform::from_xyz(board_pos.x, board_pos.y, 2.),
 
+                Pickable::default(),
+
                 TargetComponent
 
             ));
 
             target.observe(__on_click_target);
         }
+        
+        for (entity, _) in query.iter_mut() {
+            commands.entity(entity).scale_to(
+                Vec3::splat(1.),
+                Duration::from_millis(300),
+                EaseMethod::EaseFunction(EaseFunction::CubicOut),
+            );
+        }
 
         if !second_click {
-            animator.set_speed(1.);
-
-            let tween = animator.tweenable_mut();
-            tween.set_progress(0.00001);
-        }
-        
-        for (_, mut animator) in query.iter_mut() {
-            let tween = animator.tweenable_mut();
-            if tween.progress() == 0.00001 { continue };
-
-            tween.rewind();
-            animator.set_speed(0.);
+            commands.entity(input.entity).scale_to(
+                Vec3::splat(1.25),
+                Duration::from_millis(300),
+                EaseMethod::EaseFunction(EaseFunction::CubicOut),
+            );
         }
     }
 }
 
 fn __on_click_target(
-    input: Trigger<Pointer<Click>>,
+    input: On<Pointer<Click>>,
     mut game: ResMut<StandardGame>,
-    mut query: Query<(Entity, &PieceComponent, &Transform, &mut Animator<Transform>)>,
+    mut pieces: Query<(Entity, &PieceComponent, &Transform)>,
     targets: Query<(Entity, &Transform), With<TargetComponent>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>
@@ -156,7 +157,7 @@ fn __on_click_target(
     let Some(piece) = game.selected_piece
         else { return };
 
-    let Ok((_, target_transform)) = targets.get(input.entity())
+    let Ok((_, target_transform)) = targets.get(input.entity)
         else { return };
 
     for (entity, _) in targets.iter() {
@@ -168,9 +169,8 @@ fn __on_click_target(
     for (
         entity,
         component,
-        transform,
-        mut click_animator
-    ) in query.iter_mut() {
+        transform
+    ) in pieces.iter_mut() {
         let piece_pos = game.board.get_piece_position(&component.0);
 
         if target_pos == piece_pos {
@@ -190,25 +190,20 @@ fn __on_click_target(
 
         if component.0 != piece { continue };
 
-        let tween = click_animator.tweenable_mut();
-        
-        tween.rewind();
-        click_animator.set_speed(0.);
-
-        let mut piece_entity = commands.entity(entity);
-        piece_entity.insert(
-            PieceMoveAnimator::new(
+        commands.entity(entity)
+            .scale_to(
+                Vec3::splat(1.),
+                Duration::from_millis(300),
+                EaseMethod::EaseFunction(EaseFunction::CubicOut),
+            )
+            .insert(PieceMoveAnimator::new(
                 transform.translation,
                 Vec3::new(
                     target_transform.translation.x,
                     target_transform.translation.y,
                     1.
                 )
-            )
-        );
-
-        let target_board_pos = BoardComponent::get_coords_index(target_transform.translation);
-        let _target_piece = game.board.get(target_board_pos.0, target_board_pos.1);
+            ));
 
         let sound: Handle<AudioSource> = asset_server.load("sounds/piece_move.mp3");
         commands.spawn(AudioPlayer(sound));
@@ -219,12 +214,12 @@ fn __on_click_target(
 }
 
 fn __on_move_animation_ended(
-    input: Trigger<AnimationCompleted<PieceMoveAnimator>>,
+    input: On<AnimationCompleted<PieceMoveAnimator>>,
     mut game: ResMut<StandardGame>,
     query: Query<(Entity, &PieceComponent, &Transform)>,
     mut commands: Commands
 ) {
-    let Ok((entity, piece_component, transform)) = query.get(input.entity())
+    let Ok((entity, piece_component, transform)) = query.get(input.entity)
         else { return };
 
     commands.entity(entity).remove::<PieceMoveAnimator>();

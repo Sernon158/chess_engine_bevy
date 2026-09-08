@@ -1,3 +1,3 @@
-mod new_animator;
+mod tween_helpers;
 
-pub use new_animator::new_animator;
+pub use tween_helpers::new_tween;

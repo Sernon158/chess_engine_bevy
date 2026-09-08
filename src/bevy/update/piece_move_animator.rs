@@ -16,10 +16,9 @@ pub fn piece_move_animator(
         let ease_t = Ease::in_out(t);
         transform.translation = animator.start.lerp(animator.end, ease_t);
 
-        if animator.timer.finished() {
-            commands.entity(entity).trigger(
-                AnimationCompleted::<PieceMoveAnimator>::new()
-            );
+        if animator.timer.is_finished() {
+            commands.entity(entity)
+                .trigger(AnimationCompleted::<PieceMoveAnimator>::new);
         }
     }
 }

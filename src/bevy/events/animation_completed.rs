@@ -1,12 +1,19 @@
 use std::marker::PhantomData;
-
 use bevy::prelude::*;
 
-#[derive(Event)]
-pub struct AnimationCompleted<T>(PhantomData<T>);
+#[derive(EntityEvent)]
+pub struct AnimationCompleted<T>{
+    pub entity: Entity,
+
+    #[doc(hidden)]
+    _t: PhantomData<T>
+}
 
 impl<T> AnimationCompleted<T> {
-    pub fn new() -> Self {
-        Self(PhantomData)
+    pub fn new(entity: Entity) -> Self {
+        Self {
+            entity,
+            _t: PhantomData
+        }
     }
 }

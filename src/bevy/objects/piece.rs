@@ -8,7 +8,6 @@ use crate::bevy::objects::IdleAnimator;
 use crate::bevy::objects::TargetComponent;
 use crate::bevy::tools::AnimationCompleted;
 use crate::engine::game::StandardGame;
-use crate::engine::logger::LogItem;
 use crate::engine::pieces::Piece;
 
 #[derive(SceneComponent, Clone, Default)]
@@ -148,14 +147,6 @@ impl PieceComponent {
 
         game.board.set(target_x, target_y, moved_piece);
         game.board.set(curr_x, curr_y, Piece::none(target_id));
-
-        game.logger.add(LogItem {
-            capture: false,
-            piece: moved_piece,
-            target_piece: None,
-            start: (curr_x, curr_y),
-            target: (target_x, target_y)
-        });
 
         game.current_turn = curr_color.get_opposite();
         game.animation_playing = false;

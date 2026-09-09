@@ -27,6 +27,7 @@ impl Logger {
 #[derive(Clone)]
 pub struct LogItem {
     pub capture: bool,
+    pub check: bool,
     pub piece: Piece,
     pub target_piece: Option<Piece>,
     pub start: (usize, usize),

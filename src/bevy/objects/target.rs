@@ -1,10 +1,11 @@
 use std::time::Duration;
+
 use bevy::prelude::*;
 use bevy_tweening::EaseMethod;
 use bevy_tweening::EntityCommandsTweeningExtensions;
+use crate::bevy::components::PieceMoveAnimator;
 use crate::bevy::objects::BoardComponent;
 use crate::bevy::objects::PieceComponent;
-use crate::bevy::components::PieceMoveAnimator;
 use crate::engine::game::StandardGame;
 use crate::engine::logger::LogItem;
 
@@ -56,51 +57,73 @@ impl TargetComponent {
         }
 
         let target_pos = BoardComponent::get_coords_index(target_transform.translation);
+        let start_pos = game.board.get_piece_position(&piece);
 
-        for (
-            entity,
-            component,
-            transform
-        ) in pieces.iter_mut() {
-            let piece_pos = game.board.get_piece_position(&component.0);
+        let target_piece = match game.board.get(target_pos.0, target_pos.1) {
+            p if p.is_none() => None,
+            p => Some(p.clone())
+        };
+        
+        let mut sound: Option<&'static str> = None;
+        let mut capture = false;
+        let mut check = false;
+        
+        if target_piece.is_some() {
+            sound = Some("sounds/piece_capture.mp3");
+            capture = true;
+        }
 
-            if target_pos == piece_pos {
-                let sound: Handle<AudioSource> = asset_server.load("sounds/piece_capture.mp3");
-                commands.spawn(AudioPlayer(sound));
+        if game.is_king_checked_after_move(
+            piece.color.get_opposite(),
+            start_pos,
+            target_pos
+        ) {
+            sound = Some("sounds/check.mp3");
+            check = true;
+        }
 
-                commands.entity(entity).despawn();
+        if let Some(sound) = sound {
+            commands.spawn(AudioPlayer::<AudioSource>(asset_server.load(sound)));
+        }
+        
+        // Always play a piece move sound. Even if one of the other sounds has
+        // played, this will be played to complement them.
+        commands.spawn(AudioPlayer::<AudioSource>(asset_server.load("sounds/piece_move.mp3")));
 
-                game.logger.add(LogItem {
-                    capture: true,
-                    piece,
-                    target_piece: Some(component.0),
-                    start: piece_pos,
-                    target: target_pos
-                });
-            }
+        game.logger.add(LogItem {
+            capture, check, piece,
+            target_piece,
+            start: start_pos,
+            target: target_pos
+        });
 
-            if component.0 != piece { continue };
+        let (entity, _, transform) = pieces.iter()
+            .find(|(_, pc, _)| pc.0 == piece)
+            .unwrap();
 
-            commands.entity(entity)
-                .scale_to(
-                    Vec3::splat(1.),
-                    Duration::from_millis(300),
-                    EaseMethod::EaseFunction(EaseFunction::CubicOut),
+        commands.entity(entity)
+            .scale_to(
+                Vec3::splat(1.),
+                Duration::from_millis(300),
+                EaseMethod::EaseFunction(EaseFunction::CubicOut),
+            )
+            .insert(PieceMoveAnimator::new(
+                transform.translation,
+                Vec3::new(
+                    target_transform.translation.x,
+                    target_transform.translation.y,
+                    1.
                 )
-                .insert(PieceMoveAnimator::new(
-                    transform.translation,
-                    Vec3::new(
-                        target_transform.translation.x,
-                        target_transform.translation.y,
-                        1.
-                    )
-                ));
+            ));
 
-            let sound: Handle<AudioSource> = asset_server.load("sounds/piece_move.mp3");
-            commands.spawn(AudioPlayer(sound));
+        game.selected_piece = None;
+        game.animation_playing = true;
 
-            game.selected_piece = None;
-            game.animation_playing = true;
+        if let Some(target_piece) = target_piece
+        && let Some((entity, _, _)) = pieces.iter_mut()
+            .find(|(_, component, _)| component.0 == target_piece)
+        {
+            commands.entity(entity).despawn();
         }
     }
 }

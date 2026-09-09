@@ -82,6 +82,11 @@ impl StandardGame {
         })
     }
 
+    pub fn is_any_king_checked_after_move(&self, curr_pos: (usize, usize), new_pos: (usize, usize)) -> bool {
+           self.is_king_checked_after_move(Color::White, curr_pos, new_pos)
+        || self.is_king_checked_after_move(Color::Black, curr_pos, new_pos)
+    }
+
     pub fn is_king_checked_at(&self, color: Color, king_pos: (usize, usize)) -> bool {
         self.board.0.iter().flatten().any(|p| {
             if p.color == color { return false };

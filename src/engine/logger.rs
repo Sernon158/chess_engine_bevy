@@ -1,4 +1,4 @@
-use crate::pieces::{Piece, PieceKind};
+use crate::engine::pieces::{Piece, PieceKind};
 
 #[derive(Clone)]
 pub struct Logger {

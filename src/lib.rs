@@ -1,8 +1,2 @@
-pub mod pieces;
-pub mod game;
-pub mod player;
-pub mod board;
-pub mod constants;
-pub mod logger;
-
-pub mod bevy;
+#[path = "engine/@mod.rs"] pub mod engine;
+#[path = "bevy/@mod.rs"] pub mod bevy;

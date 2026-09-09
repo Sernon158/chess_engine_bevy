@@ -1,4 +1,4 @@
-use crate::pieces::{ Color, Piece, PieceKind };
+use crate::engine::pieces::{ Color, Piece, PieceKind };
 
 #[derive(Clone, Copy)]
 pub struct Board(pub [[Piece; 8]; 8]);

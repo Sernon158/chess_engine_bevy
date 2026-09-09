@@ -1,0 +1,2 @@
+mod animation_completed_event;
+pub use animation_completed_event::AnimationCompleted;

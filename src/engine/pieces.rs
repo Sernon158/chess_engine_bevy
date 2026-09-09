@@ -1,6 +1,6 @@
-use crate::{board::Board, game::StandardGame};
+use crate::engine::{board::Board, game::StandardGame};
 
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug, Default)]
 pub struct Piece {
     pub id: u8,
     pub kind: PieceKind,
@@ -48,7 +48,7 @@ impl Piece {
     }
 }
 
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug, Default)]
 pub enum PieceKind {
     Pawn,
     Rook,
@@ -56,14 +56,14 @@ pub enum PieceKind {
     Bishop,
     Queen,
     King,
-    None
+    #[default] None
 }
 
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug, Default)]
 pub enum Color {
     White,
     Black,
-    Empty
+    #[default] Empty
 }
 
 impl Color {

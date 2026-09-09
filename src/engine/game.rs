@@ -1,9 +1,10 @@
 use bevy::ecs::resource::Resource;
 
-use crate::board::Board;
-use crate::logger::Logger;
-use crate::pieces::{ Color, Piece, PieceKind };
-use crate::player::Player;
+use crate::engine::board::Board;
+use crate::engine::constants::STANDARD_GAME_MINUTES;
+use crate::engine::logger::Logger;
+use crate::engine::pieces::{ Color, Piece, PieceKind };
+use crate::engine::player::Player;
 
 #[derive(Clone, Resource)]
 pub struct StandardGame {
@@ -94,4 +95,21 @@ impl StandardGame {
         })
     }
 
+}
+
+impl Default for StandardGame {
+    fn default() -> Self {
+        Self::new((
+            Player::new(
+                None,
+                Color::White,
+                STANDARD_GAME_MINUTES
+            ),
+            Player::new(
+                None,
+                Color::Black,
+                STANDARD_GAME_MINUTES
+            )
+        ))
+    }
 }

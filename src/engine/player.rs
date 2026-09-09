@@ -1,4 +1,4 @@
-use crate::pieces::Color;
+use crate::engine::pieces::Color;
 
 #[derive(Clone)]
 pub struct Player {
